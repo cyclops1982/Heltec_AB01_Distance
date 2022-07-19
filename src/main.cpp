@@ -2,14 +2,14 @@
 // #include <LoRaWanMinimal_APP.h>
 //#include "LoraWan_config.h"
 #include <Wire.h>
-#include <Adafruit_VL53L0X.h>
+#include <VL53L0X.h>
 
 #define VERSION "0.1"
 
 static TimerEvent_t sleepTimer;
 bool lowpower = false;
 
-Adafruit_VL53L0X sensor = Adafruit_VL53L0X();
+VL53L0X sensor;
 
 static uint16_t getBatteryVoltageFloat(void)
 {
@@ -32,6 +32,47 @@ void onWakeUp()
   Serial.printf("Woke up!\n");
   TimerStop(&sleepTimer);
   lowpower = false;
+}
+
+uint16_t getMeasurement()
+{
+  uint16_t distance = 0;
+
+  digitalWrite(Vext, LOW);
+  delay(50);
+  Wire.begin();
+  delay(50);
+
+  sensor.setTimeout(500);
+  if (!sensor.init())
+  {
+    Serial.println("Failed to detect and initialize sensor!");
+    distance = 0;
+  }
+  else
+  {
+
+    // lower the return signal rate limit (default is 0.25 MCPS)
+    sensor.setSignalRateLimit(0.1);
+    // increase laser pulse periods (defaults are 14 and 10 PCLKs)
+    sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+    sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+
+    // Set high accuracy
+    sensor.setMeasurementTimingBudget(200000);
+
+    distance = sensor.readRangeSingleMillimeters();
+    if (sensor.timeoutOccurred())
+    {
+      Serial.println("Timeout occured while reading sensor.");
+      distance = 0;
+    }
+  }
+
+  Wire.end();
+  digitalWrite(Vext, HIGH);
+  delay(100);
+  return distance;
 }
 
 void setup()
@@ -75,50 +116,9 @@ void loop()
   }
   else
   {
-    digitalWrite(Vext, LOW);
-    delay(50);
-
-    if (!sensor.begin())
-    {
-      Serial.println(F("Failed to boot VL53L0X"));
-      digitalWrite(Vext, HIGH);
-      delay(1000);
-      return;
-    }
-
-    if (!sensor.configSensor(Adafruit_VL53L0X::VL53L0X_SENSE_HIGH_ACCURACY))
-    {
-      Serial.println("Failed to set high accuracy mode");
-    }
-
-    //    if (!sensor.setMeasurementTimingBudgetMicroSeconds(0xFFFF))
-    //    {
-    //      Serial.println("Failed to set measurement timing budget");
-    //    }
-
-    delay(50);
-
-    Serial.println("Reading a measurement... ");
-    VL53L0X_RangingMeasurementData_t measure;
-    VL53L0X_Error err = sensor.getSingleRangingMeasurement(&measure, false); // pass in 'true' to get debug data printout!
-    if (err != VL53L0X_ERROR_NONE)
-    {
-      Serial.printf("Got an error: %d\n", err);
-    }
-    Wire.end();
-
-    // Vext OFF
-    digitalWrite(Vext, HIGH);
-
-    if (measure.RangeStatus != 4)
-    { // phase failures have incorrect data
-      Serial.print("Distance (mm): ");
-      Serial.println(measure.RangeMilliMeter);
-    }
-    else
-    {
-      Serial.println(" out of range ");
-    }
+    uint16_t distance = getMeasurement();
+    uint16_t batteryVoltage = getBatteryVoltageFloat();
+    delay(100);
 
     digitalWrite(Vext, HIGH);
 
