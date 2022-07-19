@@ -1,6 +1,6 @@
 #include <Arduino.h>
-// #include <LoRaWanMinimal_APP.h>
-//#include "LoraWan_config.h"
+#include <LoRaWanMinimal_APP.h>
+#include "LoraWan_config.h"
 #include <Wire.h>
 #include <VL53L0X.h>
 
@@ -79,12 +79,11 @@ void setup()
 {
   pinMode(Vext, OUTPUT);
   Serial.begin(115200);
-  delay(5000);
+  delay(1000);
   Serial.printf("Booting version: %s\n", VERSION);
 
   TimerInit(&sleepTimer, onWakeUp);
 
-  /*
   LoRaWAN.begin(loraWanClass, loraWanRegion);
   LoRaWAN.setAdaptiveDR(false);
   LoRaWAN.setFixedDR(5);
@@ -105,7 +104,7 @@ void setup()
       Serial.println("JOINED");
       break;
     }
-  }*/
+  }
 }
 
 void loop()
@@ -120,11 +119,19 @@ void loop()
     uint16_t batteryVoltage = getBatteryVoltageFloat();
     delay(100);
 
-    digitalWrite(Vext, HIGH);
+    uint8_t datalen = 6;
+    uint8_t data[datalen];
+    data[0] = 0x2; // device 2
+    data[1] = 0x1; // message version 1
+    data[2] = batteryVoltage >> 8;
+    data[3] = batteryVoltage;
+    data[4] = distance >> 8;
+    data[5] = distance;
 
-    Serial.println();
+    LoRaWAN.send(datalen, data, 2, true);
     delay(100);
-    TimerSetValue(&sleepTimer, 10000);
+
+    TimerSetValue(&sleepTimer, 30000);
     TimerStart(&sleepTimer);
     lowpower = true;
   }
