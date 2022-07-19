@@ -86,9 +86,25 @@ void loop()
       return;
     }
 
-    Serial.print("Reading a measurement... ");
+    if (!sensor.configSensor(Adafruit_VL53L0X::VL53L0X_SENSE_HIGH_ACCURACY))
+    {
+      Serial.println("Failed to set high accuracy mode");
+    }
+
+    //    if (!sensor.setMeasurementTimingBudgetMicroSeconds(0xFFFF))
+    //    {
+    //      Serial.println("Failed to set measurement timing budget");
+    //    }
+
+    delay(50);
+
+    Serial.println("Reading a measurement... ");
     VL53L0X_RangingMeasurementData_t measure;
-    sensor.rangingTest(&measure, false); // pass in 'true' to get debug data printout!
+    VL53L0X_Error err = sensor.getSingleRangingMeasurement(&measure, false); // pass in 'true' to get debug data printout!
+    if (err != VL53L0X_ERROR_NONE)
+    {
+      Serial.printf("Got an error: %d\n", err);
+    }
     Wire.end();
 
     // Vext OFF
@@ -108,7 +124,7 @@ void loop()
 
     Serial.println();
     delay(100);
-    TimerSetValue(&sleepTimer, 30000);
+    TimerSetValue(&sleepTimer, 10000);
     TimerStart(&sleepTimer);
     lowpower = true;
   }
